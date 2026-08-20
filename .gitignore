@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+Icon?
+
+# macOS AppleDouble / resource-fork junk from unzipping archives
+__MACOSX/
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.Trash-*
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
