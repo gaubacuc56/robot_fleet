@@ -1,95 +1,80 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-interface UseWebSocketReturn {
+export type TConnectionState = 'connecting' | 'open' | 'closed'
+
+export interface IUseWebSocketResult {
+  connectionState: TConnectionState
   isConnected: boolean
-  lastMessage: string | null
-  sendMessage: (message: string) => void
-  reconnect: () => void
 }
 
-export function useWebSocket(url: string): UseWebSocketReturn {
-  const [isConnected, setIsConnected] = useState(false)
-  const [lastMessage, setLastMessage] = useState<string | null>(null)
-  const ws = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+export function useWebSocket<TMessage>(
+  url: string,
+  onMessage: (message: TMessage) => void,
+  reconnectDelayMs = 3000
+): IUseWebSocketResult {
+  const [connectionState, setConnectionState] =
+    useState<TConnectionState>('connecting')
 
-  const connect = () => {
+  const socketRef = useRef<WebSocket | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closedByUsRef = useRef(false)
+
+  const onMessageRef = useRef(onMessage)
+  useEffect(() => {
+    onMessageRef.current = onMessage
+  }, [onMessage])
+
+  const connect = useCallback(() => {
+    closedByUsRef.current = false
+    setConnectionState('connecting')
+
+    let socket: WebSocket
     try {
-      // TODO: Implement WebSocket connection logic
-      ws.current = new WebSocket(url)
-
-      ws.current.onopen = () => {
-        console.log('✅ WebSocket connected to:', url)
-        setIsConnected(true)
-
-        // Clear any existing reconnect timeout
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current)
-        }
-      }
-
-      ws.current.onmessage = (event) => {
-        // TODO: Handle incoming messages
-        setLastMessage(event.data)
-      }
-
-      ws.current.onclose = (event) => {
-        console.log('❌ WebSocket disconnected:', event.code, event.reason)
-        setIsConnected(false)
-
-        // TODO: Implement auto-reconnection logic
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('🔄 Attempting to reconnect...')
-          connect()
-        }, 3000)
-      }
-
-      ws.current.onerror = (error) => {
-        console.error('🚨 WebSocket error:', error)
-        setIsConnected(false)
-      }
-
+      socket = new WebSocket(url)
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error)
-      setIsConnected(false)
+      console.error('Failed to open WebSocket:', error)
+      setConnectionState('closed')
+      return
     }
-  }
 
-  const sendMessage = (message: string) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(message)
-    } else {
-      console.warn('WebSocket is not connected')
-    }
-  }
+    socketRef.current = socket
 
-  const reconnect = () => {
-    if (ws.current) {
-      ws.current.close()
+    socket.onopen = () => setConnectionState('open')
+
+    socket.onmessage = (event: MessageEvent<string>) => {
+      try {
+        onMessageRef.current(JSON.parse(event.data) as TMessage)
+      } catch (error) {
+        console.error('Dropping malformed message:', error)
+      }
     }
-    connect()
-  }
+
+    socket.onclose = () => {
+      setConnectionState('closed')
+      if (closedByUsRef.current) return
+
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null
+        connect()
+      }, reconnectDelayMs)
+    }
+  }, [url, reconnectDelayMs])
 
   useEffect(() => {
     connect()
 
-    // Cleanup on unmount
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
+      closedByUsRef.current = true
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
       }
-      if (ws.current) {
-        ws.current.close()
-      }
+      socketRef.current?.close()
+      socketRef.current = null
     }
-  }, [url])
+  }, [connect])
 
-  return {
-    isConnected,
-    lastMessage,
-    sendMessage,
-    reconnect
-  }
+  return { connectionState, isConnected: connectionState === 'open' }
 }

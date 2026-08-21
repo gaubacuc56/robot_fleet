@@ -1,0 +1,14 @@
+/*
+ * Document-level styles only. Component styling is antd's job — anything
+ * specific to a component belongs with that component, not here.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #f5f5f5;
+}
