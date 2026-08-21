@@ -2,20 +2,29 @@
   "name": "robot-fleet-backend",
   "version": "1.0.0",
   "description": "Robot Fleet Management Backend with uWebSockets.js",
-  "main": "app.js",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=18 <21"
+  },
+  "imports": {
+    "#app.js": "./src/app.js",
+    "#main.js": "./src/main.js",
+    "#config/*": "./src/config/*",
+    "#domain/*": "./src/domain/*",
+    "#features/*": "./src/features/*",
+    "#libs/*": "./src/libs/*"
+  },
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "simulator": "node simulator/robot-simulator.js",
-    "cluster": "node cluster.js"
+    "start": "node src/main.js",
+    "dev": "nodemon src/main.js",
+    "cluster": "node src/cluster.js",
+    "simulator": "node tools/simulator/robot.simulator.js"
   },
   "dependencies": {
-    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.33.0",
-    "mongodb": "^6.0.0",
-    "mongoose": "^8.14.2",
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "mongoose": "^8.14.2",
+    "redis": "^4.7.1",
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.33.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {

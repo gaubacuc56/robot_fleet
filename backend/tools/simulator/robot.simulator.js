@@ -1,18 +1,22 @@
 const WebSocket = require('ws');
 
 class RobotSimulator {
-  constructor(robotId, serverUrl = 'ws://localhost:8080') {
+  constructor(robotId, serverUrl = 'ws://localhost:8080', options = {}) {
     this.robotId = robotId;
     this.serverUrl = `${serverUrl}/robots?robotId=${robotId}`;
     this.ws = null;
     this.isConnected = false;
     this.dataInterval = null;
 
+    // Never-charge mode keeps discharging past the threshold instead of
+    // plugging in at 15%, which the critical alert needs to become reachable.
+    this.neverCharge = options.neverCharge === true;
+
     // Initialize robot state with realistic values
     this.state = {
-      batteryPercentage: Math.floor(Math.random() * 100), // 0-100%
+      batteryPercentage: this.neverCharge ? 22 : Math.floor(Math.random() * 100), // 0-100%
       wifiSignalStrength: Math.floor(Math.random() * 60) - 100, // -100 to -40 dBm
-      isCharging: Math.random() > 0.7, // 30% chance of charging
+      isCharging: this.neverCharge ? false : Math.random() > 0.7, // 30% chance of charging
       temperature: Math.floor(Math.random() * 30) + 40, // 40-70°C
       memoryUsage: Math.floor(Math.random() * 60) + 20 // 20-80%
     };
@@ -40,7 +44,7 @@ class RobotSimulator {
         try {
           const message = JSON.parse(data.toString());
           console.log(`📨 Robot ${this.robotId} received:`, message);
-          // TODO: Handle server messages (commands, etc.)
+          // No server-to-robot commands are defined by the assignment.
         } catch (error) {
           console.error(`Error parsing message for ${this.robotId}:`, error);
         }
@@ -51,7 +55,7 @@ class RobotSimulator {
         console.log(`❌ Robot ${this.robotId} disconnected (${code}): ${reason}`);
         this.stopSendingData();
 
-        // TODO: Implement reconnection logic
+        // Reconnect after a short delay.
         setTimeout(() => {
           console.log(`🔄 Attempting to reconnect robot ${this.robotId}...`);
           this.connect();
@@ -90,7 +94,10 @@ class RobotSimulator {
 
   updateState() {
     // Battery simulation
-    if (this.state.isCharging) {
+    if (this.neverCharge) {
+      this.state.isCharging = false;
+      this.state.batteryPercentage = Math.max(0, this.state.batteryPercentage - this.batteryDrainRate);
+    } else if (this.state.isCharging) {
       this.state.batteryPercentage = Math.min(100, this.state.batteryPercentage + this.chargingRate);
 
       // Stop charging when battery is full or randomly
@@ -151,13 +158,15 @@ class RobotSimulator {
   }
 }
 
-// TODO: Create multiple robot instances for testing
-function createRobotFleet(count = 5) {
+/** DRAIN_ROBOT_ID names one robot that never charges; unset for stock behaviour. */
+function createRobotFleet(count = 5, serverUrl = 'ws://localhost:8080', drainRobotId = null) {
   const robots = [];
 
   for (let i = 1; i <= count; i++) {
     const robotId = `${i.toString().padStart(5, '0')}`;
-    const robot = new RobotSimulator(robotId);
+    const robot = new RobotSimulator(robotId, serverUrl, {
+      neverCharge: drainRobotId !== null && drainRobotId === robotId,
+    });
     robots.push(robot);
 
     // Stagger connections to avoid overwhelming the server
@@ -178,12 +187,20 @@ function shutdownFleet(robots) {
 
 // Start the simulation
 if (require.main === module) {
+  const count = Number(process.env.ROBOT_COUNT) > 0 ? Number(process.env.ROBOT_COUNT) : 5;
+  const serverUrl = process.env.SERVER_URL || 'ws://localhost:8080';
+  const drainRobotId = process.env.DRAIN_ROBOT_ID || null;
+
   console.log('🚀 Starting Robot Fleet Simulator...');
-  console.log('📡 Connecting to server at ws://localhost:8080');
+  console.log(`📡 Connecting to server at ${serverUrl}`);
+  console.log(`🤖 Robots: ${count}`);
   console.log('⏱️  Robots will send data every 1 second');
+  if (drainRobotId) {
+    console.log(`🔋 Robot ${drainRobotId} will never charge (for critical battery alert)`);
+  }
   console.log('Press Ctrl+C to stop\n');
 
-  const robots = createRobotFleet(5); // Create 5 robots by default
+  const robots = createRobotFleet(count, serverUrl, drainRobotId);
 
   // Handle graceful shutdown
   process.on('SIGINT', () => shutdownFleet(robots));

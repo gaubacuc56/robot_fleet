@@ -19,10 +19,6 @@ pids/
 *.seed
 *.pid.lock
 
-# Coverage / test output
-coverage/
-.nyc_output/
-
 # Local database data
 data/
 *.sqlite

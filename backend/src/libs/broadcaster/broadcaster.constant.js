@@ -1,0 +1,6 @@
+const BROADCAST_CHANNEL = 'robot-fleet:events';
+
+const CONNECT_TIMEOUT_MS = 5000;
+const MAX_CONNECT_RETRIES = 3;
+
+module.exports = { BROADCAST_CHANNEL, CONNECT_TIMEOUT_MS, MAX_CONNECT_RETRIES };
